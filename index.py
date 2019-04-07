@@ -71,7 +71,7 @@ class ClearDarkSkyData():
             if line.split('\n')[0] == ')':
                 break
             
-            filter_text = str.maketrans('"()\n\t', "       ")
+            filter_text = line.maketrans('', '', '"\n\t()')
             values = line.translate(filter_text).split(',')[0:-2]
             datetime_obj = datetime.strptime(values[0], '%Y-%m-%d %H:%M:%S')
             transparency_values[datetime_obj] = values[1:-1]
