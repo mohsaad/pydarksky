@@ -5,11 +5,12 @@ import argparse
 import requests
 import json
 import os
-
+from sty import fg, rs
+from math import floor
 
 LOCATION_URL = "http://www.cleardarksky.com/t/chart_prop00.txt"
 BASE_URL = "http://www.cleardarksky.com/txtc"
-
+UNICODE_BLOCK = u'\u25a0'
 
 class ClearDarkSkyData():
 
@@ -70,13 +71,12 @@ class ClearDarkSkyData():
             line = f.readline()
             if line.split('\n')[0] == ')':
                 break
-            
-            filter_text = line.maketrans('', '', '"\n\t()')
-            values = line.translate(filter_text).split(',')[0:-2]
+
+            filter_table = dict.fromkeys(map(ord, '"\t\n()'), None)
+            values = line.translate(filter_table).split(',')[0:-2]
             datetime_obj = datetime.strptime(values[0], '%Y-%m-%d %H:%M:%S')
             transparency_values[datetime_obj] = values[1:-1]
 
-        
         # Get all data after next 5 lines.
         
         for i in range(0, 5):
@@ -87,20 +87,49 @@ class ClearDarkSkyData():
             if line.split('\n')[0] == ')':
                 break
 
-            values = line.translate(filter_text).split(',') 
+            values = line.translate(filter_table).split(',') 
             datetime_obj = datetime.strptime(values[0], '%Y-%m-%d %H:%M:%S')
       
             if datetime_obj in transparency_values:
-                transparency_values[datetime_obj].append(values[1:-1])
-
-        for key in transparency_values:
-            transparency_values[key] = [item for sublist in transparency_values[key] for item in sublist]
+                for item in values[1:-1]:
+                    transparency_values[datetime_obj].append(item)
 
         return transparency_values
 
     def print_transparency_values(self, transparency_values):
-      print(u'\u25a0')  
-      print(transparency_values)
+        tens_digit_str = ""
+        ones_digit_str = ""
+        cloud_str = ""
+        transparency_str = ""
+        seeing_str = ""
+        darkness_str = ""
+
+
+        for key in sorted(transparency_values):
+            cloud_add = int(transparency_values[key][0]) * 23
+            trans_add = int(transparency_values[key][1]) * 46
+            see_add = int(transparency_values[key][2]) * 46
+            
+            tens_digit_str += str(key.hour).zfill(2)[0] + " "
+            ones_digit_str += str(key.hour).zfill(2)[1] + " "
+            cloud_str += fg(255 - cloud_add, cloud_add, 0) + UNICODE_BLOCK + fg.rs + " "
+            transparency_str += fg(255 - trans_add, trans_add, 0) + UNICODE_BLOCK + fg.rs + " "
+            seeing_str += fg(255 - see_add, see_add, 0) + UNICODE_BLOCK + fg.rs + " "
+            
+            if len(transparency_values[key]) > 5:
+                darkness_add = floor(float(transparency_values[key][5]) * 24 + 104)
+            else:
+                darkness_add = 255
+
+            darkness_str += fg(255 - darkness_add, 255 - darkness_add, 255 - darkness_add) + UNICODE_BLOCK + fg.rs + " "
+
+        
+        print("              {}".format(tens_digit_str))
+        print("              {}".format(ones_digit_str))
+        print("Cloud Cover:  {}".format(cloud_str))
+        print("Transparency: {}".format(transparency_str))
+        print("Seeing:       {}".format(seeing_str))
+        print("Darkness:     {}".format(darkness_str))
 
 def main():
     parser = argparse.ArgumentParser(description="Get clear sky charts and display them in the terminal")
