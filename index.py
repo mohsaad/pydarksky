@@ -19,6 +19,10 @@ APP_NAME = "PyDarkSky"
 APP_AUTHOR = "mohsaad"
 STATE_FILENAME = 'current_location.state'
 
+BACKGROUND_COLOR = 233
+HEADER_COLOR = 202
+
+
 class ClearDarkSkyData():
 
     def __init__(self):
@@ -31,9 +35,10 @@ class ClearDarkSkyData():
 
         # Try to load a state file. If failure, make sure to run setting program.
         try:
-            self.location = pickle.load(open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'rb'))
+            self.location, self.location_name = pickle.load(open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'rb'))
         except Exception as e:
             self.location = None
+            self.location_name = ''
 
         self.location_download_path = self.dirs.user_cache_dir + '/sky_locations.txt'
         self._build_or_load_location_map()
@@ -47,19 +52,20 @@ class ClearDarkSkyData():
             print("State not found!")
 
 
-        key = state.translate(sanitized_table).lower()
-        for i in range(0, len(self.locations[key])):
-            print("({}): {}".format(i, self.locations[key][i][1]))
+        key = state.lower()
+        for i in range(0, len(self.locations_by_state[key])):
+            print("({}): {}".format(i, self.locations_by_state[key][i][1]))
 
         while True:
             try:
                 choice = input("Enter your choice here: ")
-                self.location = self.locations[key][int(choice)][0]
+                self.location = self.locations_by_state[key][int(choice)][0]
+                self.location_name = self.locations_by_state[key][int(choice)][1]
                 break
             except (ValueError, IndexError) as e:
                 print("Invalid choice!")
 
-        pickle.dump(self.location, open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME)))
+        pickle.dump((self.location, self.location_name), open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'wb'))
 
     def set_location_by_city(self):
         cities = []
@@ -80,11 +86,12 @@ class ClearDarkSkyData():
             try:
                 choice = input("Enter your choice here: ")
                 self.location = self.locations_by_city[cities[int(choice)]][0]
+                self.location_name = self.locations_by_city[cities[int(choice)]][1]
                 break
             except (ValueError, IndexError) as e:
                 print("Invalid choice!")
 
-        pickle.dump(self.location, open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'wb'))
+        pickle.dump((self.location, self.location_name), open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'wb'))
 
     def _check_for_existing_locations(self):
         if os.path.exists(self.location_download_path):
@@ -167,9 +174,9 @@ class ClearDarkSkyData():
 
         return transparency_values
 
-    def print_transparency_values(self, transparency_values):
+    def print_transparency_values(self, transparency_values, name, state):
         # Initialize strings
-
+        
         current_date = datetime.now().strftime("%Y-%m-%d")
         current_time = datetime.now().strftime("%H:%M")
 
@@ -202,20 +209,28 @@ class ClearDarkSkyData():
 
             darkness_str += fg(255 - darkness_add, 255 - darkness_add, 255 - darkness_add) + UNICODE_BLOCK + fg.rs + " "
 
-        print(tens_digit_str)
-        print(ones_digit_str)
-        print(cloud_str)
-        print(transparency_str)
-        print(seeing_str)
-        print(darkness_str)
+        string_length = (15 + len(transparency_values.keys()) * 2)       
+        header = bg(BACKGROUND_COLOR) + fg(HEADER_COLOR) + '-' * string_length  + fg.rs + bg.rs
+        title_string = bg(BACKGROUND_COLOR) + fg(HEADER_COLOR) + " Clear Sky Chart for {}, {} ".format(name, state).center(string_length, '-') + fg.rs + bg.rs
+        print(header)
+        print(title_string)
+        print(header)
+        print(bg(BACKGROUND_COLOR) + tens_digit_str + bg.rs)
+        print(bg(BACKGROUND_COLOR) + ones_digit_str + bg.rs)
+        print(bg(BACKGROUND_COLOR) + cloud_str + bg.rs)
+        print(bg(BACKGROUND_COLOR) + transparency_str + bg.rs)
+        print(bg(BACKGROUND_COLOR) + seeing_str + bg.rs)
+        print(bg(BACKGROUND_COLOR) + darkness_str + bg.rs)
 
     def sky_chart_pipeline(self):
         if self.location is None:
             self.set_location_by_city()
 
+        state = self.location[-2:]
+      
         link = self.download_sky_chart(self.location)
         vals = self.interpret_sky_chart(link)
-        self.print_transparency_values(vals)
+        self.print_transparency_values(vals, self.location_name, state)
 
 
 def main():
