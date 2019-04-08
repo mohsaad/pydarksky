@@ -11,6 +11,9 @@ from math import floor
 LOCATION_URL = "http://www.cleardarksky.com/t/chart_prop00.txt"
 BASE_URL = "http://www.cleardarksky.com/txtc"
 UNICODE_BLOCK = u'\u25a0'
+TIME_COLORS = [10,11,9,14]
+
+
 
 class ClearDarkSkyData():
 
@@ -18,7 +21,9 @@ class ClearDarkSkyData():
         self.locations = {}
         self.location_download_path = '/tmp/sky_locations.txt'
         self._build_or_load_location_map()
-
+        self.counter = 0
+        self.days = []
+      
     def _check_for_existing_locations(self):
         if os.path.exists(self.location_download_path):
             return True
@@ -98,15 +103,16 @@ class ClearDarkSkyData():
 
     def print_transparency_values(self, transparency_values):
         # Initialize strings
-        tens_digit_str = ""
-        ones_digit_str = ""
-        cloud_str = ""
-        transparency_str = ""
-        seeing_str = ""
-        darkness_str = ""
 
-        current_date = str(datetime.now().strftime("%Y-%m-%d"))
-        current_time = str(datetime.now().strftime("%H:%M"))
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M")
+
+        tens_digit_str = fg(10) + "{0: <15}".format(current_date) + fg.rs
+        ones_digit_str = fg(11) + "{0: <15}".format(current_time) + fg.rs
+        transparency_str = fg(15) + "{0: <15}".format("Transparency:") + fg.rs
+        cloud_str = fg(15) + "{0: <15}".format("Cloud Cover:") + fg.rs
+        seeing_str = fg(15) + "{0: <15}".format("Seeing:") + fg.rs
+        darkness_str = fg(15) + "{0: <15}".format("Darkness:") + fg.rs
 
         # Go through each data point
         for key in sorted(transparency_values):
@@ -114,8 +120,11 @@ class ClearDarkSkyData():
             trans_add = int(transparency_values[key][1]) * 46
             see_add = int(transparency_values[key][2]) * 46
             
-            tens_digit_str += fg(0, 204, 204) + str(key.hour).zfill(2)[0] + fg.rs + " "
-            ones_digit_str += fg(0, 204, 204) + str(key.hour).zfill(2)[1] + fg.rs + " "
+            if int(key.hour) == 0:
+                self.counter += 1
+
+            tens_digit_str += fg(TIME_COLORS[self.counter]) + str(key.hour).zfill(2)[0] + fg.rs + " "
+            ones_digit_str += fg(TIME_COLORS[self.counter]) + str(key.hour).zfill(2)[1] + fg.rs + " "
             cloud_str += fg(255 - cloud_add, cloud_add, 0) + UNICODE_BLOCK + fg.rs + " "
             transparency_str += fg(255 - trans_add, trans_add, 0) + UNICODE_BLOCK + fg.rs + " "
             seeing_str += fg(255 - see_add, see_add, 0) + UNICODE_BLOCK + fg.rs + " "
@@ -127,12 +136,12 @@ class ClearDarkSkyData():
 
             darkness_str += fg(255 - darkness_add, 255 - darkness_add, 255 - darkness_add) + UNICODE_BLOCK + fg.rs + " "
 
-        print("{0: <15}{1}".format(current_date, tens_digit_str))
-        print("{0: <15}{1}".format(current_time, ones_digit_str))
-        print("{0: <15}{1}".format("Cloud Cover:", cloud_str))
-        print("{0: <15}{1}".format("Transparency:", transparency_str))
-        print("{0: <15}{1}".format("Seeing:", seeing_str))
-        print("{0: <15}{1}".format("Darkness:", darkness_str))
+        print(tens_digit_str)
+        print(ones_digit_str)
+        print(cloud_str)
+        print(transparency_str)
+        print(seeing_str)
+        print(darkness_str)
 
 def main():
     parser = argparse.ArgumentParser(description="Get clear sky charts and display them in the terminal")
