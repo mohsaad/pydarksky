@@ -3,6 +3,7 @@
 from datetime import datetime
 import argparse
 import requests
+import pickle
 import json
 import os
 from sty import fg, rs, bg
@@ -16,28 +17,33 @@ TIME_COLORS = [10,11,9,14]
 
 APP_NAME = "PyDarkSky"
 APP_AUTHOR = "mohsaad"
+STATE_FILENAME = 'current_location.state'
 
 class ClearDarkSkyData():
 
     def __init__(self):
-        self.locations = {}
+        self.locations_by_state = {}
+        self.locations_by_city = {}
         self.dirs = AppDirs(APP_NAME, APP_AUTHOR)
         
         if not os.path.exists(self.dirs.user_cache_dir):
             os.makedirs(self.dirs.user_cache_dir)
 
+        # Try to load a state file. If failure, make sure to run setting program.
+        try:
+            self.location = pickle.load(open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'rb'))
+        except Exception as e:
+            self.location = None
 
         self.location_download_path = self.dirs.user_cache_dir + '/sky_locations.txt'
         self._build_or_load_location_map()
         self.counter = 0
-        self.location = None
 
     def set_location_by_state(self):
         while True:
             state = input("Enter your state: ")
-            sanitized_table = dict.fromkeys(map(ord, '"\t\n()#'), None)
-            if state.translate(sanitized_table).lower() in self.locations:
-                break      
+            if self._search_locations_by_state(state):
+                break
             print("State not found!")
 
 
@@ -50,11 +56,35 @@ class ClearDarkSkyData():
                 choice = input("Enter your choice here: ")
                 self.location = self.locations[key][int(choice)][0]
                 break
-            except ValueError:
+            except (ValueError, IndexError) as e:
                 print("Invalid choice!")
 
+        pickle.dump(self.location, open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME)))
 
-        # TODO: Dump choice to pickle with timestamp
+    def set_location_by_city(self):
+        cities = []
+        while True:
+            city = input("Enter your city: ")
+            for key in self.locations_by_city:
+                if city.lower() in key:
+                    cities.append(key)
+            
+            if len(cities) > 0:
+                break
+            print("No cities found!")
+
+        for i in range(0, len(cities)):
+            print("({}): {}".format(i, self.locations_by_city[cities[i]][1]))
+
+        while True:
+            try:
+                choice = input("Enter your choice here: ")
+                self.location = self.locations_by_city[cities[int(choice)]][0]
+                break
+            except (ValueError, IndexError) as e:
+                print("Invalid choice!")
+
+        pickle.dump(self.location, open('{}/{}'.format(self.dirs.user_cache_dir, STATE_FILENAME), 'wb'))
 
     def _check_for_existing_locations(self):
         if os.path.exists(self.location_download_path):
@@ -73,16 +103,18 @@ class ClearDarkSkyData():
         f = open(self.location_download_path, encoding = "ISO-8859-1")
         for line in f:
             key, state, location = line.split('\n')[0].split('|')
-            if not state.lower() in self.locations:
-                self.locations[state.lower()] = [(key, location)]
+            if not state.lower() in self.locations_by_state:
+                self.locations_by_state[state.lower()] = [(key, location)]
             else:
-                self.locations[state.lower()].append((key, location))
+                self.locations_by_state[state.lower()].append((key, location))
 
-    def search_locations(self, state):
-        if not state.lower() in self.locations:
-            return None
+            self.locations_by_city[location.lower()] = (key, location)
+
+    def _search_locations_by_state(self, state):
+        if not state.lower() in self.locations_by_state:
+            return False
         else:
-            return self.locations[state.lower()]
+            return True
 
     def download_sky_chart(self, key):
         url = '{}/{}csp.txt'.format(BASE_URL, key)
@@ -177,22 +209,37 @@ class ClearDarkSkyData():
         print(seeing_str)
         print(darkness_str)
 
+    def sky_chart_pipeline(self):
+        if self.location is None:
+            self.set_location_by_city()
+
+        link = self.download_sky_chart(self.location)
+        vals = self.interpret_sky_chart(link)
+        self.print_transparency_values(vals)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Get clear sky charts and display them in the terminal")
-    parser.add_argument('--search', action='store_true', help='Search for a location')
-
+    parser.add_argument('--search-by-state', action='store_true', help='Search for a location by state')
+    parser.add_argument('--search-by-city', action='store_true', help='Search for a location by state')
+  
     args = parser.parse_args()
 
-
+    location_set = False
     c = ClearDarkSkyData()
     
-    if args.search:
+    if args.search_by_state and args.search_by_city:
+        c.set_location_by_city()
+        location_set = True
+
+    if args.search_by_state and not location_set:
         c.set_location_by_state()
 
+    if args.search_by_city and not location_set:
+        c.set_location_by_city()
 
-    link = c.download_sky_chart('SanFranCA')
-    vals = c.interpret_sky_chart(link)
-    c.print_transparency_values(vals)
+    c.sky_chart_pipeline()
+
 
 if __name__ == '__main__':
     main()
