@@ -7,23 +7,55 @@ import json
 import os
 from sty import fg, rs, bg
 from math import floor
+from appdirs import AppDirs
 
 LOCATION_URL = "http://www.cleardarksky.com/t/chart_prop00.txt"
 BASE_URL = "http://www.cleardarksky.com/txtc"
 UNICODE_BLOCK = u'\u25a0'
 TIME_COLORS = [10,11,9,14]
 
-
+APP_NAME = "PyDarkSky"
+APP_AUTHOR = "mohsaad"
 
 class ClearDarkSkyData():
 
     def __init__(self):
         self.locations = {}
-        self.location_download_path = '/tmp/sky_locations.txt'
+        self.dirs = AppDirs(APP_NAME, APP_AUTHOR)
+        
+        if not os.path.exists(self.dirs.user_cache_dir):
+            os.makedirs(self.dirs.user_cache_dir)
+
+
+        self.location_download_path = self.dirs.user_cache_dir + '/sky_locations.txt'
         self._build_or_load_location_map()
         self.counter = 0
-        self.days = []
-      
+        self.location = None
+
+    def set_location_by_state(self):
+        while True:
+            state = input("Enter your state: ")
+            sanitized_table = dict.fromkeys(map(ord, '"\t\n()#'), None)
+            if state.translate(sanitized_table).lower() in self.locations:
+                break      
+            print("State not found!")
+
+
+        key = state.translate(sanitized_table).lower()
+        for i in range(0, len(self.locations[key])):
+            print("({}): {}".format(i, self.locations[key][i][1]))
+
+        while True:
+            try:
+                choice = input("Enter your choice here: ")
+                self.location = self.locations[key][int(choice)][0]
+                break
+            except ValueError:
+                print("Invalid choice!")
+
+
+        # TODO: Dump choice to pickle with timestamp
+
     def _check_for_existing_locations(self):
         if os.path.exists(self.location_download_path):
             return True
@@ -38,7 +70,7 @@ class ClearDarkSkyData():
 
     def _build_or_load_location_map(self):
         self._download_locations()
-        f = open('/tmp/sky_locations.txt', encoding = "ISO-8859-1")
+        f = open(self.location_download_path, encoding = "ISO-8859-1")
         for line in f:
             key, state, location = line.split('\n')[0].split('|')
             if not state.lower() in self.locations:
@@ -55,9 +87,11 @@ class ClearDarkSkyData():
     def download_sky_chart(self, key):
         url = '{}/{}csp.txt'.format(BASE_URL, key)
         r = requests.get(url)
-        open('/tmp/{}.txt'.format(key), 'wb').write(r.content)
+        filename = "{}/{}.txt".format(self.dirs.user_cache_dir, key)
 
-        return "/tmp/{}.txt".format(key)
+        open(filename, 'wb').write(r.content)
+
+        return filename
 
     def interpret_sky_chart(self, key_file):
         f = open(key_file, 'r')
@@ -145,9 +179,17 @@ class ClearDarkSkyData():
 
 def main():
     parser = argparse.ArgumentParser(description="Get clear sky charts and display them in the terminal")
-    parser.add_argument('--search', help='Search for a location')
+    parser.add_argument('--search', action='store_true', help='Search for a location')
+
+    args = parser.parse_args()
+
 
     c = ClearDarkSkyData()
+    
+    if args.search:
+        c.set_location_by_state()
+
+
     link = c.download_sky_chart('SanFranCA')
     vals = c.interpret_sky_chart(link)
     c.print_transparency_values(vals)
