@@ -15,7 +15,7 @@ BASE_URL = "http://www.cleardarksky.com/txtc"
 UNICODE_BLOCK = u'\u25a0'
 TIME_COLORS = [10,11,9,14]
 
-APP_NAME = "PyDarkSky"
+APP_NAME = "ClearSkyCharts"
 APP_AUTHOR = "mohsaad"
 STATE_FILENAME = 'current_location.state'
 
@@ -231,30 +231,3 @@ class ClearDarkSkyData():
         link = self.download_sky_chart(self.location)
         vals = self.interpret_sky_chart(link)
         self.print_transparency_values(vals, self.location_name, state)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Get clear sky charts and display them in the terminal")
-    parser.add_argument('--search-by-state', action='store_true', help='Search for a location by state')
-    parser.add_argument('--search-by-city', action='store_true', help='Search for a location by state')
-  
-    args = parser.parse_args()
-
-    location_set = False
-    c = ClearDarkSkyData()
-    
-    if args.search_by_state and args.search_by_city:
-        c.set_location_by_city()
-        location_set = True
-
-    if args.search_by_state and not location_set:
-        c.set_location_by_state()
-
-    if args.search_by_city and not location_set:
-        c.set_location_by_city()
-
-    c.sky_chart_pipeline()
-
-
-if __name__ == '__main__':
-    main()
